@@ -133,3 +133,5 @@ dmypy.json
 docs/
 data/
 examples/
+tmp/
+.idea/

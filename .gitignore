@@ -135,3 +135,5 @@ data/
 examples/
 tmp/
 .idea/
+slide_API/
+log/

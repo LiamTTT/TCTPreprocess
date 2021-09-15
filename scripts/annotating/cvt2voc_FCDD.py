@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 '''
-@Author: LiuSibo
+@Author: LiamTTT
 @Project: TCTPreprocess
 @File: cvt2voc_FCDD.py
 @Date: 2021/9/10 

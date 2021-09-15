@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 '''
-@Author: LiuSibo
+@Author: LiamTTT
 @Project: TCTPreprocess.py
 @File: slide_reader.py
 @Date: 2021/9/10

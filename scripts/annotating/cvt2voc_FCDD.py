@@ -21,33 +21,17 @@ from glob2 import glob
 # from rich.progress import track
 from tqdm import tqdm
 
-from core.annotations.utils import create_voc_annotation, create_voc_object, BndBox
+from core.annotations import (
+    create_voc_annotation, create_voc_object,
+    find_neighbors, get_bnd_in_tile,
+    BndBox
+)
+from core.common import save_xml_str, check_dir
 from core.slide_reader import SlideReader
 
 logger.add(f'log/{os.path.basename(__file__)}.log', backtrace=True, diagnose=True)
 
 DST_MPP = 0.67  # um/pixel Portable Microscope
-
-
-def check_dir(dir, create=False):
-    existed = os.path.exists(dir)
-    if not existed and create:
-        logger.debug(f'create {dir}')
-        return os.makedirs(dir)
-    return existed
-
-
-def save_xml_str(xml_str, save_path, mode='w+'):
-    """Save xml string to xml file.
-    """
-    dom = parseString(xml_str)
-    try:
-        with open(save_path, mode) as f:
-            dom.writexml(f)
-        return True
-    except:
-        logger.exception(f'Write {save_path} failed! mode: {mode}')
-        return False
 
 
 def format_det_object_dict(det_obj_dict):
@@ -65,44 +49,6 @@ def format_det_object_dict(det_obj_dict):
     return det_obj_dict
 
 
-def find_neighbors(bnds_center, tile_size):
-    """find neighbors for each bnd given.
-    :param bnds_center: all bnd centers
-    :param tile_size: tile size
-    :return: neighbor id and delta to center bnd
-    """
-    neighbors = []
-    deltas = []
-    for idx, bnd_center in enumerate(bnds_center):
-        centers_delta = bnds_center - bnd_center
-        x_neighbor = np.where(np.abs(centers_delta[:, 0]) < tile_size[0])
-        y_neighbor = np.where(np.abs(centers_delta[:, 1]) < tile_size[1])
-        neighbor = x_neighbor[0].tolist() + y_neighbor[0].tolist()
-        neighbor = list(set(sorted(neighbor)))
-        neighbor.remove(idx)
-        neighbors.append(neighbor)
-        deltas.append([centers_delta[i] for i in neighbor])
-    return neighbors, deltas
-
-
-def get_bnd_in_tiles(center_delta, bnd_size, tile_size):
-    """ get bnd coordinates in tile
-    :param center_delta: current bnd delta to center bnd
-    :param bnd_size: current bnd size
-    :param tile_size: tile size
-    :return: [xmin, ymin, xmax, ymax], segmented
-    """
-    bnd_center = tile_size//2 + center_delta
-    bnd_size = bnd_size//2
-    bnd_tl = bnd_center - bnd_size
-    bnd_br = bnd_center + bnd_size
-    bnd = np.stack((bnd_tl, bnd_br))
-    if (bnd < 0).any() or (bnd[:, 0] > tile_size[0]).any() or (bnd[:, 1] > tile_size[1]).any():
-        return np.clip(bnd, [0, 0], tile_size).ravel(), True
-    else:
-        return bnd.ravel(), False
-
-
 def get_obj_in_tile(det_object, center_delta, bnd_size, tile_size):
     """ Create objects in tile
     :param det_object: the origin object in WSI, for getting necessary info for creating new object.
@@ -114,9 +60,9 @@ def get_obj_in_tile(det_object, center_delta, bnd_size, tile_size):
     obj_kwargs = copy.deepcopy(det_object)
     obj_kwargs = {**obj_kwargs, **obj_kwargs['bndbox']}
     obj_kwargs.pop('bndbox')
-    (obj_kwargs['xmin'], obj_kwargs['ymin'], obj_kwargs['xmax'], obj_kwargs['ymax']), seg = get_bnd_in_tiles(center_delta,
-                                                                                                      bnd_size,
-                                                                                                      tile_size)
+    (obj_kwargs['xmin'], obj_kwargs['ymin'], obj_kwargs['xmax'], obj_kwargs['ymax']), seg = get_bnd_in_tile(center_delta,
+                                                                                                            bnd_size,
+                                                                                                            tile_size)
     return create_voc_object(**obj_kwargs), seg
 
 
@@ -183,7 +129,7 @@ def create_annotation_of_slide(xml_path, tile_size):
     return annotations
 
 
-def create_annotations_of_batch(xml_dir, tile_size):
+def create_annotation_of_batch(xml_dir, tile_size):
     """ Create all annotations in a batch of WSIs
     :param xml_dir: Dir to FCDD annotation xml files for a batch of WSIs
     :param tile_size: tile size
@@ -218,13 +164,13 @@ def create_dataset_for_batch(dataset_root, xml_dir, tile_size):
     """
     logger.info(f'Create dataset Annotations file: {dataset_root}')
     save_annos_dir = os.path.join(dataset_root, 'Annotations')
-    check_dir(save_annos_dir, True)
-    batch_annotations = create_annotations_of_batch(xml_dir, tile_size)
+    check_dir(save_annos_dir, True, logger)
+    batch_annotations = create_annotation_of_batch(xml_dir, tile_size)
     nb_success = 0
     since = time()
     for anno in tqdm(batch_annotations, desc=f'Save annotations in {save_annos_dir}'):
         save_path = os.path.join(save_annos_dir, anno.filename.replace('jpg', 'xml'))
-        if save_xml_str(anno.to_xml(), save_path, 'w+'):
+        if save_xml_str(anno.to_xml(), save_path, 'w+', logger):
             nb_success += 1
     total_time = time() - since
     logger.info(f'create {nb_success} annotations file in {save_annos_dir}')
@@ -237,7 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_root', help='dir to all FCDD dataset root', type=str)
     parser.add_argument('--dataset_list', help='dataset name list, also the folder name. Empty for all',
                         type=str, nargs='*', default=[])
-    parser.add_argument('--tile_size', help='tile size',
+    parser.add_argument('--tile_size', help='tile size in 0.67um/pixel',
                         type=int, nargs='+', default=[800])
     parser.add_argument('--slide_root', help='dir to WSI files', type=str)
     parser.add_argument('--batch_to_x', help='path to batch to x file', type=str)
@@ -288,7 +234,7 @@ if __name__ == '__main__':
     # process
     for dataset_name in dataset_list:
         dataset_dir = os.path.join(dataset_root, dataset_name)
-        check_dir(dataset_dir, True)
+        check_dir(dataset_dir, True, logger)
         xml_dir = os.path.join(xml_root, dataset_name)
         create_dataset_for_batch(dataset_dir, xml_dir, tile_size)
     # end process

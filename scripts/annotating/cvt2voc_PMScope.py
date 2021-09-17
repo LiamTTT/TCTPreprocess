@@ -80,7 +80,6 @@ def create_annotation_of_roi(image_roi):
     image_device = 'PortableMicroScope'
     wsi_batch = roi_info['batch']
     wsi_name = roi_info['slide']  # e.g. sfy1104135
-    width, height = TILE_SIZE
     source_kwarg = {'source': {'image_roi': image_roi}}
     folder = wsi_batch
     # filename
@@ -88,7 +87,7 @@ def create_annotation_of_roi(image_roi):
     # process object
     annotation_objects = ANNOTATIONS[wsi_batch][wsi_name][image_roi]['objects']
     tile_size = np.array(TILE_SIZE)
-    wsi_bnds_center = np.array([obj['wsi_center'] for obj in annotation_objects])
+    # wsi_bnds_center = np.array([obj['wsi_center'] for obj in annotation_objects])  # bnd center on wsi where the roi comes from
     bnds_center = np.array([obj['center'] for obj in annotation_objects])
     bnds_wh = np.array([obj['bnd_size'] for obj in annotation_objects])
     bnds_cls = [obj['name'] for obj in annotation_objects]
@@ -118,7 +117,8 @@ def create_annotation_of_roi(image_roi):
             image_device, wsi_batch, wsi_name, wsi_bndbox,
             *tile_size,
             objects,
-            segmented
+            segmented,
+            **source_kwarg
         )
         annotations.append(voc_anno)
     return annotations

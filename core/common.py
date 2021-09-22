@@ -17,7 +17,7 @@ def check_dir(dir, create=False, logger=None):
     if not existed and create:
         if logger is not None:
             logger.debug(f'create {dir}')
-        return os.makedirs(dir)
+        existed = True if os.makedirs(dir) is None else False
     return existed
 
 

@@ -51,7 +51,7 @@ if __name__ == '__main__':
     logger.info('train : evel : test = {} : {} : {}'.format(*ratios))
     ratios = np.array(ratios)
 
-    splitting_file_dir = os.path.join(dataset_root, 'Main')
+    splitting_file_dir = os.path.join(dataset_root, 'ImageSets', 'Main')
     check_dir(splitting_file_dir, create=True, logger=logger)
     train_file_path = os.path.join(splitting_file_dir, 'train.txt')
     eval_file_path = os.path.join(splitting_file_dir, 'val.txt')

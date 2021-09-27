@@ -110,7 +110,7 @@ if __name__ == '__main__':
             # adding slides left into test set
             logger.warning('adding slides left into test set')
             for cur_sld_n in slide_name:
-                cur_samples = [os.path.basename(f) for f in glob(os.path.join(jpegimages_dir, f'{cur_sld_n}_*.jpg'))]
+                cur_samples = [os.path.basename(f).split('.jpg')[0] for f in glob(os.path.join(jpegimages_dir, f'{cur_sld_n}_*.jpg'))]
                 cur_samples_nb = len(cur_samples)
 
                 ls_samples[i] += cur_samples

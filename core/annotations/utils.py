@@ -61,8 +61,7 @@ def find_neighbors(bnds_center, tile_size):
         centers_delta = bnds_center - bnd_center
         x_neighbor = np.where(np.abs(centers_delta[:, 0]) < tile_size[0])
         y_neighbor = np.where(np.abs(centers_delta[:, 1]) < tile_size[1])
-        neighbor = x_neighbor[0].tolist() + y_neighbor[0].tolist()
-        neighbor = list(set(sorted(neighbor)))
+        neighbor = np.intersect1d(x_neighbor[0].tolist(), y_neighbor[0].tolist()).tolist()
         neighbor.remove(idx)
         neighbors.append(neighbor)
         deltas.append([centers_delta[i] for i in neighbor])

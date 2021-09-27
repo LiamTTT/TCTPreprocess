@@ -94,7 +94,7 @@ def create_annotation_of_slide(xml_path, tile_size):
     if not isinstance(xml_objects, list):
         xml_objects = [xml_objects]
     det_objects = [format_det_object_dict(ob) for ob in xml_objects]  # convert str to appropriate data type
-    bounding_boxes = np.array([[v for _, v in ob['bndbox'].items()] for ob in det_objects])  # xmin ymin xmax ymax
+    bounding_boxes = np.array([[ob['bndbox']['xmin'], ob['bndbox']['ymin'], ob['bndbox']['xmax'], ob['bndbox']['ymax']] for ob in det_objects])
     bnds_center = (bounding_boxes[:, :2] + bounding_boxes[:, 2:])//2
     bnds_wh = bounding_boxes[:, 2:] - bounding_boxes[:, :2] + 1
     # find neighbors idx and deltas

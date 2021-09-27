@@ -13,7 +13,6 @@ import json
 import argparse
 from time import time
 from threading import Thread, Lock
-from multiprocessing import Lock
 from concurrent.futures import (ThreadPoolExecutor, ProcessPoolExecutor, as_completed)
 
 import cv2

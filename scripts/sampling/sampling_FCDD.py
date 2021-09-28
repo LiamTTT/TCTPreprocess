@@ -23,7 +23,7 @@ from loguru import logger
 
 from core.slide_reader import SlideReader
 from core.sampling import sampling
-from core.common import check_dir
+from core.common import check_dir, verify_jpeg
 
 wsi_handle = SlideReader()
 SRC_TYPE = 'MicroScope'
@@ -48,7 +48,10 @@ def create_sample_for_annotation_xml(xml_file):
 
 def create_and_save_sample_for_annotation_xml(xml_file, jpeg_path, lock):
     if os.path.exists(jpeg_path):
-        return True
+        jpeg_status = verify_jpeg(jpeg_path)
+        if jpeg_status:
+            return True
+        logger.info(f'{jpeg_path} has been corrupted, remake.')
     with lock:  # make sure the tile is correct
         sample = create_sample_for_annotation_xml(xml_file)
     if sample is None:

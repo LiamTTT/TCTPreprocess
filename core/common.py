@@ -11,6 +11,8 @@
 import os
 from xml.dom.minidom import parseString
 
+from PIL import Image
+
 
 def check_dir(dir, create=False, logger=None):
     existed = os.path.exists(dir)
@@ -34,3 +36,16 @@ def save_xml_str(xml_str, save_path, mode='w+', logger=None):
             logger.exception(f'Write {save_path} failed! mode: {mode}')
         return False
 
+
+def verify_jpeg(image_path):
+    """ inspired by https://github.com/ultralytics/yolov5/issues/916#issuecomment-862208988
+        Check whether the jpeg is corrupted JPEG.
+    """
+    im = Image.open(image_path)
+    try:
+        im.verify()  # PIL verify
+    except Exception as exc:
+        return False
+    with open(image_path, 'rb') as f:
+        f.seek(-2, 2)
+        return f.read() == b'\xff\xd9'

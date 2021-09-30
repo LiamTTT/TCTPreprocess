@@ -19,9 +19,8 @@ def sampling(bnd, source, src_type):
     :param src_type:
     :return: a ndarray representing a BGR image.
     """
-    # TODO 20210917 LiamTTT: need a way to make this function parallel.
     bnd_xy = bnd[:2]
-    bnd_wh = bnd[2:] - bnd[:2] + 1
+    bnd_wh = bnd[2:] - bnd[:2]
     sample = np.zeros(bnd_wh.tolist()[::-1] + [3], dtype=np.uint8)  # create a container for image
     # compute shift and real crop wh, only top-left
     crop_shift = np.clip(0 - bnd_xy, (0, 0), None)
@@ -49,5 +48,8 @@ def sampling_wsi_handle(bnd_xy, bnd_wh, source, level=0):
 
 def sampling_roi_array(bnd_xy, bnd_wh, source):
     bnd_xy_end = bnd_xy + bnd_wh
-    image = source[bnd_xy[1]: bnd_xy_end[1], bnd_xy[0]: bnd_xy_end[1], ...]
+    image = source[bnd_xy[1]: bnd_xy_end[1], bnd_xy[0]: bnd_xy_end[0], ...]
+    # wsi can pad area exceeding br with 0 or 255, numpy array won't.
+    pad = bnd_wh - image.shape[:2][::-1]
+    image = np.pad(image, ((0, pad[1]), (0, pad[0]), (0, 0)))
     return image

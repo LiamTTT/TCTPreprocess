@@ -6,7 +6,7 @@
 @File: spliting_train_eval_test.py.py
 @Date: 2021/9/22 
 @Time: 下午4:26
-@Desc: Splitting train eval and test set on slide level
+@Desc: Random splitting train eval and test set on slide level
 '''
 import os
 import sys

@@ -58,7 +58,7 @@ def process_csv_file(csv_file):
             obj = {
                 'name': anno_n,
                 'center': [int(float(cx)), int(float(cy))],
-                'bnd_size': [int(float(w)), int(float(w))],
+                'bnd_size': [int(float(w)), int(float(h))],
                 'wsi_center': [int(float(scx)), int(float(scy))]
             }
             annotations[bat][sld_n][img_roi]['objects'].append(obj)

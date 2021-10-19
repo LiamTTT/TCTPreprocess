@@ -49,3 +49,40 @@ def verify_jpeg(image_path):
     with open(image_path, 'rb') as f:
         f.seek(-2, 2)
         return f.read() == b'\xff\xd9'
+
+
+def match_sld_in_list(sld_n, sld_list):
+    nb_sld = len(sld_list)
+    sl1 = [sn.split(' ')[0] for sn in sld_list]
+    sl2 = [sn.split('_')[0] for sn in sld_list]
+    sl3 = ['_'.join(sn.split('_')[1:]) for sn in sld_list if len(sn.split('_')) > 1]
+    sl4 = ['_'.join(sn.split(' ')[1:]) for sn in sld_list if len(sn.split(' ')) > 1]
+    sl5 = [sn.split('_')[1] for sn in sld_list if len(sn.split('_')) > 1]
+    sl6 = [' '.join(sn.split(' ')[1:]) for sn in sld_list if len(sn.split(' ')) > 1]
+    sl7 = [' '.join(sn.split('_')[1:]) for sn in sld_list if len(sn.split('_')) > 1]
+    sl8 = [sn.split(' ')[1] for sn in sld_list if len(sn.split(' ')) > 1]
+    sl = sl1 + sl2 + sl2 + sl3 + sl4 + sl5 + sl6 + sl7 + sl8
+    if sld_n in sld_list:
+        return sld_n
+    else:
+        if sld_n in sl:
+            s_id = sl.index(sld_n) % nb_sld
+            matched_sld = sld_list[s_id]
+            return matched_sld
+        elif sld_n.split(' ')[0] in sl:
+            s_id = sl.index(sld_n.split(' ')[0]) % nb_sld
+            matched_sld = sld_list[s_id]
+            return matched_sld
+        elif sld_n.split('_')[0] in sl:
+            s_id = sl.index(sld_n.split('_')[0]) % nb_sld
+            matched_sld = sld_list[s_id]
+            return matched_sld
+        elif '_'.join(sld_n.split('_')[1:]) in sl:
+            s_id = sl.index('_'.join(sld_n.split('_')[1:])) % nb_sld
+            matched_sld = sld_list[s_id]
+            return matched_sld
+        else:
+            return None
+
+
+

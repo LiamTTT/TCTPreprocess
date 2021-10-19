@@ -10,6 +10,7 @@
 '''
 import os
 import sys
+import re
 import argparse
 import random
 import json
@@ -18,8 +19,9 @@ from glob2 import glob
 import numpy as np
 from loguru import logger
 
-from core.common import check_dir
+from core.common import check_dir, match_sld_in_list
 
+random.seed(42)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Splitting train val test set automatically.')
@@ -27,16 +29,13 @@ if __name__ == '__main__':
                         help='root to dataset containing \'Annotations\' and \'JPEGImages\' dir.')
     parser.add_argument('--ratios', type=float, nargs='+', default=[8, 1, 1],
                         help='ratios for trains test val dataset.')
-    parser.add_argument('--seed', type=int, default=42, help='random seed.')
     parser.add_argument('--splitting_dict', type=str, help='pre-define splitting dict of slides name.', default=None)
     parser.add_argument('--roi', help="whether contain roi info.", action='store_true')
     args = parser.parse_args()
     SET_NAME = ['train', 'eval', 'test']
-    SEED = args.seed
-    splitting_dict = args.splitting_dict
+    splitting_dict = os.path.abspath(args.splitting_dict)
     flg_roi = args.roi
-    dataset_root = args.dataset_root
-    dataset_root = os.path.abspath(dataset_root)
+    dataset_root = os.path.abspath(args.dataset_root)
     logger.info(f'Processing {dataset_root}')
     ratios = args.ratios
     if splitting_dict is not None:
@@ -94,20 +93,23 @@ if __name__ == '__main__':
     if splitting_dict is not None:
         logger.warning('Do splitting according to pre defined splitting json file. '
                        'Slides not mentioned in pre-defined file will be splitted according to ratios.')
-        pre_ls_slides = [splitting_dict[k] for k in SET_NAME]
-        for i, sld_ns in enumerate(pre_ls_slides):
+        pre_all_ls_slides = [splitting_dict[k] for k in SET_NAME]
+        for i, sld_ns in enumerate(pre_all_ls_slides):
             for cur_sld_n in sld_ns:
-                if cur_sld_n not in slide_name:
+                cur_matched = match_sld_in_list(cur_sld_n, slide_name)
+                if cur_matched is None:
                     continue
+                if cur_matched != cur_sld_n:
+                    logger.warning(f'{cur_sld_n} matched {cur_matched}')
+                pre_ls_slides[i].append(cur_matched)
                 pre_ls_samples[i] += [os.path.basename(f).split('.jpg')[0] for f in
-                                      glob(os.path.join(jpegimages_dir, f'{cur_sld_n}_*.jpg'))]
-                slide_name.remove(cur_sld_n)
+                                      glob(os.path.join(jpegimages_dir, f'{cur_matched}_*.jpg'))]
+                slide_name.remove(cur_matched)
             logger.info(
-                'Pre-splitting {} set -- slide num: {} sample num: {}'.format(
-                    SET_NAME[i], len(pre_ls_slides[i]), len(pre_ls_samples[i])
+                'Pre-splitting {} set -- total num of pre-splitting: {} slide num: {} sample num: {}'.format(
+                    SET_NAME[i], len(sld_ns), len(pre_ls_slides[i]), len(pre_ls_samples[i])
                 ))
     # random splitting
-    random.seed(SEED)  # FIXME 20210923 siboliu: the results is still random.
     ls_samples = [[], [], []]
     ls_slides = [[], [], []]
     # splitting per set

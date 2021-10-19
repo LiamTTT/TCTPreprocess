@@ -68,6 +68,26 @@ def find_neighbors(bnds_center, tile_size):
     return neighbors, deltas
 
 
+def find_neighbors_for_given_center(cur_idx, center_shift, tile_size, bnds_center):
+    """ find neighbors for given center and its shift in tile.
+    :param cur_idx: idx of given center
+    :param center_shift: shift from tile center, top left "-", bottom right "+"
+    :param tile_size: tile size
+    :param bnds_center: all bnds' center
+    :return:
+    """
+    cur_bnd_center = bnds_center[cur_idx]
+    bnds_delta = bnds_center-cur_bnd_center
+    lt_t, lt_l = tile_size//2 + center_shift
+    lt_b, lt_r = tile_size//2 - center_shift
+    x_neighbor = np.intersect1d(np.where(bnds_delta[:, 0] > -lt_l)[0], np.where(bnds_delta[:, 0] < lt_r)[0])
+    y_neighbor = np.intersect1d(np.where(bnds_delta[:, 1] > -lt_t)[0], np.where(bnds_delta[:, 1] < lt_b)[0])
+    neighbor = np.intersect1d(x_neighbor, y_neighbor).tolist()
+    neighbor.remove(cur_idx)
+    deltas = [bnds_delta[i] for i in neighbor]
+    return neighbor, deltas
+
+
 def get_bnd_in_tile(center_delta, bnd_size, tile_size):
     """ get bnd coordinates in tile
     :param center_delta: current bnd delta to center bnd

@@ -11,27 +11,25 @@ import json
 import os
 import copy
 import argparse
+import random
 from time import time
-from xml.dom.minidom import parseString
 
 import xmltodict
 import numpy as np
 from loguru import logger
 from glob2 import glob
-# from rich.progress import track
 from tqdm import tqdm
 
 from core.annotations import (
     create_voc_annotation, create_voc_object,
-    find_neighbors, get_bnd_in_tile,
+    find_neighbors_for_given_center, get_bnd_in_tile,
     BndBox
 )
 from core.common import save_xml_str, check_dir
 from core.slide_reader import SlideReader
 
-logger.add(f'log/{os.path.basename(__file__)}.log', backtrace=True, diagnose=True)
-
 DST_MPP = 0.67  # um/pixel Portable Microscope
+random.seed(42)
 
 
 def format_det_object_dict(det_obj_dict):
@@ -66,7 +64,7 @@ def get_obj_in_tile(det_object, center_delta, bnd_size, tile_size):
     return create_voc_object(**obj_kwargs), seg
 
 
-def create_annotation_of_slide(xml_path, tile_size):
+def create_annotation_of_slide(xml_path, tile_size, center_anno=True, nb_sample=1):
     """ Create all annotations in the slide
     :param xml_path: FCDD annotation xml file for WSIs
     :param tile_size: specified tile size
@@ -97,39 +95,46 @@ def create_annotation_of_slide(xml_path, tile_size):
     bounding_boxes = np.array([[ob['bndbox']['xmin'], ob['bndbox']['ymin'], ob['bndbox']['xmax'], ob['bndbox']['ymax']] for ob in det_objects])
     bnds_center = (bounding_boxes[:, :2] + bounding_boxes[:, 2:])//2
     bnds_wh = bounding_boxes[:, 2:] - bounding_boxes[:, :2] + 1
-    # find neighbors idx and deltas
-    neighbors_idx, neighbors_delta = find_neighbors(bnds_center, tile_size//2)
     # create xml file
     for idx, det_object in enumerate(det_objects):
-        objects = []
-        # get center object
-        obj_in_tile, segmented = get_obj_in_tile(det_object, np.zeros((2,)), bnds_wh[idx], tile_size)
-        objects.append(obj_in_tile)
-        for ni, nd in zip(neighbors_idx[idx], neighbors_delta[idx]):
-            obj_in_tile, seg = get_obj_in_tile(det_objects[ni], nd, bnds_wh[ni], tile_size)
-            segmented |= seg
+        # get main object
+        main_shifts = []
+        for shift_id in range(nb_sample):
+            shift_x = (random.random() - 0.5) * 0.96 * tile_size[0]
+            shift_y = (random.random() - 0.5) * 0.96 * tile_size[1]
+            main_shifts.append(np.array([shift_x, shift_y], dtype=int))
+        if center_anno:
+            main_shifts[0] = np.zeros((2, ))
+        for shift_id, main_shift in enumerate(main_shifts):
+            objects = []
+            obj_in_tile, segmented = get_obj_in_tile(det_object, main_shift, bnds_wh[idx], tile_size)
             objects.append(obj_in_tile)
-        # define other attributes in annotation file.
-        filename = '{:s}_{:0>3d}_{:d}_{:d}_{:s}.jpg'.format(wsi_name.split(f'.{wsi_suffix}')[0], idx, *bnds_center[idx], det_object['name'])
-        padding = [0, 0]  # pad to right and bottom half of tile
-        if tile_size[0] % 2:
-            padding[0] += 1
-        if tile_size[1] % 2:
-            padding[1] += 1
-        wsi_bndbox = BndBox(
-            *((bnds_center[idx] - tile_size // 2).tolist() + (bnds_center[idx] + (tile_size // 2) + padding).tolist()))
-        voc_anno = create_voc_annotation(
-            folder, filename,
-            image_device, wsi_batch, wsi_name, wsi_bndbox,
-            *tile_size,
-            objects,
-            segmented
-        )
-        annotations.append(voc_anno)
+            neighbor_idx, neighbor_delta = find_neighbors_for_given_center(idx, main_shift, tile_size, bnds_center)
+            for ni, nd in zip(neighbor_idx, neighbor_delta):
+                obj_in_tile, seg = get_obj_in_tile(det_objects[ni], main_shift + nd, bnds_wh[ni], tile_size)
+                segmented |= seg
+                objects.append(obj_in_tile)
+            # define other attributes in annotation file.
+            filename = '{:s}_{:0>3d}_{:d}_{:d}_{:d}_{:s}.jpg'.format(wsi_name.split(f'.{wsi_suffix}')[0], idx, shift_id, *bnds_center[idx], det_object['name'])
+            padding = [0, 0]  # pad to right and bottom half of tile
+            if tile_size[0] % 2:
+                padding[0] += 1
+            if tile_size[1] % 2:
+                padding[1] += 1
+            wsi_bndbox = BndBox(
+                *((bnds_center[idx] - main_shift - tile_size // 2).tolist() + (bnds_center[idx] - main_shift + (tile_size // 2) + padding).tolist()))
+            voc_anno = create_voc_annotation(
+                folder, filename,
+                image_device, wsi_batch, wsi_name, wsi_bndbox,
+                *tile_size,
+                objects,
+                segmented
+            )
+            annotations.append(voc_anno)
     return annotations
 
 
-def create_annotation_of_batch(xml_dir, tile_size):
+def create_annotation_of_batch(xml_dir, tile_size, center_anno=True, nb_sample=1):
     """ Create all annotations in a batch of WSIs
     :param xml_dir: Dir to FCDD annotation xml files for a batch of WSIs
     :param tile_size: tile size
@@ -143,7 +148,7 @@ def create_annotation_of_batch(xml_dir, tile_size):
     since = time()
     for xml_path in tqdm(xmls_path, desc=f'Process {xml_dir}'):
         try:
-            slide_annotations = create_annotation_of_slide(xml_path, tile_size)
+            slide_annotations = create_annotation_of_slide(xml_path, tile_size, center_anno=center_anno, nb_sample=nb_sample)
         except:
             logger.exception(f'process {xml_path} failed!')
             continue
@@ -156,7 +161,7 @@ def create_annotation_of_batch(xml_dir, tile_size):
     return batch_annotations
 
 
-def create_dataset_for_batch(dataset_root, xml_dir, tile_size):
+def create_dataset_for_batch(dataset_root, xml_dir, tile_size, center_anno=True, nb_sample=1):
     """ Create and save annotations file for a dataset.
     :param dataset_root: dataset root for saving annotations
     :param xml_dir: related FCDD annotation xml files
@@ -165,7 +170,7 @@ def create_dataset_for_batch(dataset_root, xml_dir, tile_size):
     logger.info(f'Create dataset Annotations file: {dataset_root}')
     save_annos_dir = os.path.join(dataset_root, 'Annotations')
     check_dir(save_annos_dir, True, logger)
-    batch_annotations = create_annotation_of_batch(xml_dir, tile_size)
+    batch_annotations = create_annotation_of_batch(xml_dir, tile_size, center_anno=center_anno, nb_sample=nb_sample)
     nb_success = 0
     since = time()
     for anno in tqdm(batch_annotations, desc=f'Save annotations in {save_annos_dir}'):
@@ -185,6 +190,8 @@ if __name__ == '__main__':
                         type=str, nargs='*', default=[])
     parser.add_argument('--tile_size', help='tile size in 0.67um/pixel',
                         type=int, nargs='+', default=[800])
+    parser.add_argument('--center_anno', default=False, action='store_true', help='always create center annotation')
+    parser.add_argument('--nb_sample', default=1, type=int, help='number of sample to create.')
     parser.add_argument('--slide_root', help='dir to WSI files', type=str)
     parser.add_argument('--batch_to_x', help='path to batch to x file', type=str)
     parser.add_argument('--attrs_lut', help='path to WSI attributes', type=str)
@@ -206,10 +213,17 @@ if __name__ == '__main__':
     dataset_list = args.dataset_list
     tile_size = args.tile_size
     slide_root = args.slide_root
+    center_anno = args.center_anno
+    nb_sample = args.nb_sample
+    if nb_sample < 1 or nb_sample > 9:
+        nb_sample = np.clip(nb_sample, 1, 9)
+        logger.warning(f"clip nb_sample to {nb_sample}")
+    logger.info(f'create {nb_sample} samples for each annotation. make annotaion at center: {center_anno}')
     if not os.path.isdir(xml_root):
         raise ValueError(f'FCDD xml root: {slide_root} is not a directory')
     logger.info(f'FCDD xml root: {xml_root}')
 
+    check_dir(dataset_root, True, logger)
     if not os.path.isdir(dataset_root):
         raise ValueError(f'Dataset root: {dataset_root} is not a directory')
     logger.info(f'Dataset root: {dataset_root}')
@@ -236,5 +250,5 @@ if __name__ == '__main__':
         dataset_dir = os.path.join(dataset_root, dataset_name)
         check_dir(dataset_dir, True, logger)
         xml_dir = os.path.join(xml_root, dataset_name)
-        create_dataset_for_batch(dataset_dir, xml_dir, tile_size)
+        create_dataset_for_batch(dataset_dir, xml_dir, tile_size, center_anno=center_anno, nb_sample=nb_sample)
     # end process

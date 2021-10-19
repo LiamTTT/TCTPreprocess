@@ -10,6 +10,7 @@
 import os
 import json
 import argparse
+import random
 from time import time
 
 import numpy as np
@@ -18,12 +19,12 @@ from loguru import logger
 
 from core.common import check_dir, save_xml_str
 from core.annotations import (
-    find_neighbors, get_bnd_in_tile,
+    find_neighbors_for_given_center, get_bnd_in_tile,
     create_voc_annotation, create_voc_object,
     BndBox
 )
 
-logger.add(f'log/{os.path.basename(__file__)}.log', backtrace=True, diagnose=True)
+random.seed(42)
 
 
 def process_csv_file(csv_file):
@@ -72,7 +73,7 @@ def get_obj_in_tile(name, center_delta, bnd_size, tile_size):
     return create_voc_object(name, xmin, ymin, xmax, ymax), seg
 
 
-def create_annotation_of_roi(image_roi):
+def create_annotation_of_roi(image_roi, center_anno=True, nb_sample=1):
     annotations = []
     # get roi meta info
     roi_info = BMP_INFO_LUT[image_roi]
@@ -91,40 +92,47 @@ def create_annotation_of_roi(image_roi):
     bnds_center = np.array([obj['center'] for obj in annotation_objects])
     bnds_wh = np.array([obj['bnd_size'] for obj in annotation_objects])
     bnds_cls = [obj['name'] for obj in annotation_objects]
-    # find neighbors idx and deltas
-    neighbors_idx, neighbors_delta = find_neighbors(bnds_center, tile_size//2)
     # create voc annotations
     for idx in range(len(annotation_objects)):
-        objects = []
-        # get center object
-        obj_in_tile, segmented = get_obj_in_tile(bnds_cls[idx], np.zeros((2,)), bnds_wh[idx], tile_size)
-        objects.append(obj_in_tile)
-        for ni, nd in zip(neighbors_idx[idx], neighbors_delta[idx]):
-            obj_in_tile, seg = get_obj_in_tile(bnds_cls[ni], nd, bnds_wh[ni], tile_size)
-            segmented |= seg
+        # get main object
+        main_shifts = []
+        for shift_id in range(nb_sample):
+            shift_x = (random.random() - 0.5) * 0.96 * tile_size[0]
+            shift_y = (random.random() - 0.5) * 0.96 * tile_size[1]
+            main_shifts.append(np.array([shift_x, shift_y], dtype=int))
+        if center_anno:
+            main_shifts[0] = np.zeros((2,))
+        for shift_id, main_shift in enumerate(main_shifts):
+            objects = []
+            obj_in_tile, segmented = get_obj_in_tile(bnds_cls[idx], main_shift, bnds_wh[idx], tile_size)
             objects.append(obj_in_tile)
-        # define other attributes in annotation file.
-        filename = '{:s}_{:s}_{:0>3d}_{:d}_{:d}_{:s}.jpg'.format(wsi_name, image_roi.split('.bmp')[0], idx, *bnds_center[idx], bnds_cls[idx])
-        padding = [0, 0]  # pad to right and bottom half of tile
-        if tile_size[0] % 2:
-            padding[0] += 1
-        if tile_size[1] % 2:
-            padding[1] += 1
-        wsi_bndbox = BndBox(
-            *((bnds_center[idx] - tile_size // 2).tolist() + (bnds_center[idx] + (tile_size // 2) + padding).tolist()))
-        voc_anno = create_voc_annotation(
-            folder, filename,
-            image_device, wsi_batch, wsi_name, wsi_bndbox,
-            *tile_size,
-            objects,
-            segmented,
-            **source_kwarg
-        )
-        annotations.append(voc_anno)
+            neighbor_idx, neighbor_delta = find_neighbors_for_given_center(idx, main_shift, tile_size, bnds_center)
+            for ni, nd in zip(neighbor_idx, neighbor_delta):
+                obj_in_tile, seg = get_obj_in_tile(bnds_cls[ni], main_shift + nd, bnds_wh[ni], tile_size)
+                segmented |= seg
+                objects.append(obj_in_tile)
+            # define other attributes in annotation file.
+            filename = '{:s}_{:s}_{:0>3d}_{:d}_{:d}_{:d}_{:s}.jpg'.format(wsi_name, image_roi.split('.bmp')[0], idx, shift_id, *bnds_center[idx], bnds_cls[idx])
+            padding = [0, 0]  # pad to right and bottom half of tile
+            if tile_size[0] % 2:
+                padding[0] += 1
+            if tile_size[1] % 2:
+                padding[1] += 1
+            wsi_bndbox = BndBox(
+                *((bnds_center[idx] - main_shift - tile_size // 2).tolist() + (bnds_center[idx] - main_shift + (tile_size // 2) + padding).tolist()))
+            voc_anno = create_voc_annotation(
+                folder, filename,
+                image_device, wsi_batch, wsi_name, wsi_bndbox,
+                *tile_size,
+                objects,
+                segmented,
+                **source_kwarg
+            )
+            annotations.append(voc_anno)
     return annotations
 
 
-def create_annotation_of_batch(batch_name):
+def create_annotation_of_batch(batch_name, center_anno=True, nb_sample=1):
     wsis_anno = ANNOTATIONS[batch_name]
     logger.info(f'Process {batch_name}')
     logger.info(f'WSI nums: {len(wsis_anno)}')
@@ -135,7 +143,7 @@ def create_annotation_of_batch(batch_name):
     for sld_n, rois_anno in tqdm(wsis_anno.items(), desc=f'Process {batch_name}'):
         for roi_n in rois_anno.keys():
             try:
-                roi_annotations = create_annotation_of_roi(roi_n)
+                roi_annotations = create_annotation_of_roi(roi_n, center_anno, nb_sample)
             except:
                 logger.exception('process {}-{} failed! ROI path: {}'.format(sld_n, roi_n, BMP_INFO_LUT[roi_n]['path']))
                 continue
@@ -148,11 +156,11 @@ def create_annotation_of_batch(batch_name):
     return batch_annotations
 
 
-def create_dataset_for_batch(dataset_dir, dataset_name):
+def create_dataset_for_batch(dataset_dir, dataset_name, center_anno=True, nb_sample=1):
     logger.info(f'Create dataset Annotations file: {dataset_dir}')
     save_annos_dir = os.path.join(dataset_dir, 'Annotations')
     check_dir(save_annos_dir, True, logger)
-    batch_annotations = create_annotation_of_batch(dataset_name)
+    batch_annotations = create_annotation_of_batch(dataset_name, center_anno, nb_sample)
     nb_success = 0
     since = time()
     for anno in tqdm(batch_annotations, desc=f'Save annotations in {save_annos_dir}'):
@@ -173,6 +181,8 @@ if __name__ == '__main__':
                         type=str, nargs='*', default=[])
     parser.add_argument('--tile_size', help='tile size in 0.67um/pixel',
                         type=int, nargs='+', default=[800])
+    parser.add_argument('--center_anno', default=False, action='store_true', help='always create center annotation')
+    parser.add_argument('--nb_sample', default=1, type=int, help='number of sample to create.')
     args = parser.parse_args()
 
     # Parse args
@@ -195,6 +205,12 @@ if __name__ == '__main__':
     else:
         raise ValueError(f'Tile size {tile_size} should be [width, height] or [length] for square')
     TILE_SIZE = tile_size
+    center_anno = args.center_anno
+    nb_sample = args.nb_sample
+    if nb_sample < 1 or nb_sample > 9:
+        nb_sample = np.clip(nb_sample, 1, 9)
+        logger.warning(f"clip nb_sample to {nb_sample}")
+    logger.info(f'create {nb_sample} samples for each annotation. make annotaion at center: {center_anno}')
     # get dataset list
     dataset_list = args.dataset_list
     if len(dataset_list) == 0:
@@ -208,5 +224,5 @@ if __name__ == '__main__':
     for dataset_name in dataset_list:
         dataset_dir = os.path.join(dataset_root, dataset_name)
         check_dir(dataset_dir, True, logger)
-        create_dataset_for_batch(dataset_dir, dataset_name)
-    # end proces
+        create_dataset_for_batch(dataset_dir, dataset_name, center_anno, nb_sample)
+    # end process

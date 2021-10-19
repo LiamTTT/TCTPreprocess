@@ -9,6 +9,6 @@
 '''
 from .utils import (
     create_voc_object, create_voc_annotation,
-    find_neighbors, get_bnd_in_tile
+    find_neighbors, find_neighbors_for_given_center, get_bnd_in_tile
 )
 from .VOCAnnotation import Annotation, Object, BndBox, Size, Source

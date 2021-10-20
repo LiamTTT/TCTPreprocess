@@ -51,7 +51,7 @@ def create_and_save_sample_for_annotation_xml(xml_file, jpeg_path, lock):
         jpeg_status = verify_jpeg(jpeg_path)
         if jpeg_status:
             return True
-        logger.info(f'{jpeg_path} has been corrupted, remake.')
+        logger.info(f'{jpeg_path} is corrupted, remake.')
     with lock:  # make sure the tile is correct
         sample = create_sample_for_annotation_xml(xml_file)
     if sample is None:

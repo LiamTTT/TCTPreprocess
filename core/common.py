@@ -41,8 +41,8 @@ def verify_jpeg(image_path):
     """ inspired by https://github.com/ultralytics/yolov5/issues/916#issuecomment-862208988
         Check whether the jpeg is corrupted JPEG.
     """
-    im = Image.open(image_path)
     try:
+        im = Image.open(image_path)
         im.verify()  # PIL verify
     except Exception as exc:
         return False

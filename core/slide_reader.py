@@ -10,9 +10,16 @@
 import os
 import openslide
 import numpy as np
+from loguru import logger
 from collections import Iterable
 from openslide import OpenSlide
 from thirdparty.slide_API import Sdpc, Srp
+
+__all__ = [
+    "SlideReader",
+    "mpp_transformer",
+    "get_attrs"
+]
 
 
 class SlideReader:
@@ -29,12 +36,10 @@ class SlideReader:
         return self._path
 
     def open(self, path):
-        if path == self._path:
+        if path == self._path or path is None:
             return
         else:
-            if self._path is not None:
-                self.handle.close()
-                del self.handle
+            self.close()
         try:
             self.suffix = os.path.splitext(path)[-1]
             if self.suffix == ".sdpc":
@@ -48,30 +53,19 @@ class SlideReader:
             else:
                 raise ValueError("File type: {} is not supported.".format(self.suffix))
             self._path = path
-        except:
-            del self.handle
-
-            self.handle = None
-            self._path = None
+        except Exception as e:
+            logger.error(f'{e}\nNote: some system requires absolute path for wsi image.')
+            self.close()
 
     def close(self):
+        self._path = None
         if self.handle is None:
             return
         self.handle.close()
-        del self.handle
-
         self.handle = None
-        self._path = None
 
     def get_attrs(self):
-        if self.suffix in [".sdpc", ".srp"]:
-            self.attrs = self.handle.getAttrs()
-            self.attrs["bound_init"] = (0, 0)
-            self.attrs["level_ratio"] = 2
-        elif self.suffix in ['.svs', '.mrxs']:
-            self.attrs = get_openslide_attrs(self.handle)
-
-        return self.attrs
+        return get_attrs(self)
 
     def get_tile(self, location: tuple, size: tuple, level: int):
         """ get tile from slide
@@ -114,8 +108,26 @@ class SlideReader:
             tile = np.array(self.handle.read_region(location, 0, size).convert('RGB'))
         return tile
 
+    def __del__(self):
+        self.close()
+
 
 # == Aux Functions ==
+def get_attrs(wsi_handle):
+    attrs = {}
+    try:
+        if wsi_handle.suffix in [".sdpc", ".srp"]:
+            attrs = wsi_handle.handle.getAttrs()
+            attrs["bound_init"] = (0, 0)
+            attrs["level_ratio"] = 2
+        elif wsi_handle.suffix in ['.svs', '.mrxs']:
+            attrs = get_openslide_attrs(wsi_handle.handle)
+    except Exception as e:
+        logger.error(e)
+
+    return attrs
+
+
 def mpp_transformer(origin, origin_mpp, aim_mpp):
     """transform numbers according to mpp
     :param origin: original numbers

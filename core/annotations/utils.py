@@ -104,3 +104,44 @@ def get_bnd_in_tile(center_delta, bnd_size, tile_size):
         return np.clip(bnd, [0, 0], tile_size).ravel(), True
     else:
         return bnd.ravel(), False
+
+
+def process_csv_file(csv_file, bmp_info_lut, logger):
+    annotations = {}
+    with open(csv_file, 'r') as f:
+        lines = f.readlines()[1:]
+        logger.info(f'Num of annotations: {len(lines)}')
+        nb_success = 0
+        for line in lines:
+            bat, img_roi, cx, cy, w, h, anno_n, sld_n, scx, scy, roi_p = line.strip().split(',')
+            # rename batch name
+            try:
+                if bat.upper() not in bmp_info_lut[img_roi]['batch']:
+                    logger.error(
+                        'slide batch({}) does not match to json file({}).'.format(bat, bmp_info_lut[img_roi]['batch']))
+                    continue
+                bat = bmp_info_lut[img_roi]['batch']
+            except KeyError:
+                logger.exception(f'No {roi_p} info in BMP_INFO_LUT')
+                continue
+            # init data struct, if necessary
+            if bat not in annotations.keys():
+                annotations[bat] = {}
+            if sld_n not in annotations[bat].keys():
+                annotations[bat][sld_n] = {}
+            if img_roi not in annotations[bat][sld_n].keys():
+                annotations[bat][sld_n][img_roi] = {
+                    'ROI_path': roi_p,
+                    'objects': []
+                }
+            # record
+            obj = {
+                'name': anno_n,
+                'center': [int(float(cx)), int(float(cy))],
+                'bnd_size': [int(float(w)), int(float(h))],
+                'wsi_center': [int(float(scx)), int(float(scy))]
+            }
+            annotations[bat][sld_n][img_roi]['objects'].append(obj)
+            nb_success += 1
+    logger.info(f'{nb_success} success')
+    return annotations

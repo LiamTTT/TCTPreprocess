@@ -65,7 +65,8 @@ class SlideReader:
         self.handle = None
 
     def get_attrs(self):
-        return get_attrs(self)
+        self.attrs = get_attrs(self)
+        return self.attrs
 
     def get_tile(self, location: tuple, size: tuple, level: int):
         """ get tile from slide

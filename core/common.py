@@ -23,6 +23,20 @@ def check_dir(dir, create=False, logger=None):
     return existed
 
 
+def check_file(file_path, raise_error=False, logger=None, mute=True):
+    existed = os.path.isfile(file_path)
+    if not existed:
+        msg = f"{file_path} is not existed!"
+        if raise_error:
+            raise FileNotFoundError(msg)
+        elif logger is not None:
+            logger.warning(msg)
+        else:
+            if not mute:
+                print(msg)
+    return existed
+
+
 def save_xml_str(xml_str, save_path, mode='w+', logger=None):
     """Save xml string to xml file.
     """

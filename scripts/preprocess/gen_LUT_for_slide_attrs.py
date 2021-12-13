@@ -52,13 +52,23 @@ if __name__ == '__main__':
         sld_root = bat2root[batch_n]
         batch_suffix = bat2suffix[batch_n]
 
-        batch_dir = os.path.join(sld_root, batch_d)
-        slide_list = [s for s in os.listdir(batch_dir) if is_bat_wsi(os.path.join(batch_dir, s), batch_suffix)]
-
-        logger.info(f'{batch_n} {batch_dir}')
+        if isinstance(batch_d, str):
+            batch_dirs = [os.path.join(sld_root, batch_d)]
+        elif isinstance(batch_d, list):
+            batch_dirs = [os.path.join(sld_root, d) for d in batch_d]
+        else:
+            raise ValueError(f"Format of WSI related dir in batch {batch_n} is wrong.")
+        slide_list = []
+        for batch_dir in batch_dirs:
+            slide_list += [s for s in os.listdir(batch_dir) if is_bat_wsi(os.path.join(batch_dir, s), batch_suffix)]
+        slide_list = list(set(slide_list))
+        logger.info(f'{batch_n} {batch_dirs}')
         total_attrs[batch_n] = {}
         for sld_n in tqdm(slide_list):
-            sld_p = os.path.join(batch_dir, sld_n)
+            for batch_dir in batch_dirs:
+                sld_p = os.path.join(batch_dir, sld_n)
+                if os.path.isfile(sld_p):
+                    break
             try:
                 handle.open(sld_p)
                 sld_attrs = handle.get_attrs()

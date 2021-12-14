@@ -81,6 +81,21 @@ def _get_homography(target_feature, temp_feature, matcher, abort_thre=0.6, min_m
         return False
 
 
+def _save_image(image_path, image, max_try=3):
+    if not RESUME:
+        cv2.imwrite(image_path, image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+    for _ in range(max_try):
+        if verify_png(image_path):
+            return True
+        cv2.imwrite(image_path, image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+    if verify_png(image_path):
+        return True
+    else:
+        # delete corrupt image and return false
+        os.remove(image_path)
+        return False
+
+
 def _match_and_save(matcher, target_feature, temp_info, lock, wsi_reader, roi_path, save_path):
     temp_kp, temp_des, temp_w, temp_h = temp_info
     M = _get_homography(target_feature, (temp_kp, temp_des), matcher, ABORT_THRE, MIN_MATCH_COUNT)
@@ -127,7 +142,10 @@ def _match_and_save(matcher, target_feature, temp_info, lock, wsi_reader, roi_pa
         logger.warning(f"fine tune failed!")
         return M_reverse
     target_image = cv2.warpPerspective(target_image, M_reverse, (temp_w, temp_h))
-    cv2.imwrite(save_path, target_image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+    # ensure the image is saved completely
+    if not _save_image(save_path, target_image):
+        logger.error(f"save {save_path} failed!")
+        return False
     lock.acquire()
     with open(os.path.dirname(save_path) + ".txt", "a") as f:
         f.write(f"{save_path};{target_rect.tolist()};{M_reverse.tolist()}\n")

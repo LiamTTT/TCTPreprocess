@@ -65,6 +65,20 @@ def verify_jpeg(image_path):
         return f.read() == b'\xff\xd9'
 
 
+def verify_png(image_path):
+    """ inspired by https://github.com/ultralytics/yolov5/issues/916#issuecomment-862208988
+        Check whether the PNG is corrupted PNG.
+    """
+    try:
+        im = Image.open(image_path)
+        im.verify()  # PIL verify
+    except Exception as exc:
+        return False
+    with open(image_path, 'rb') as f:
+        f.seek(-8, 2)
+        return f.read() == b'IEND\xaeB`\x82'
+
+
 def match_sld_in_list(sld_n, sld_list):
     nb_sld = len(sld_list)
     sl1 = [sn.split(' ')[0] for sn in sld_list]

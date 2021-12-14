@@ -22,14 +22,11 @@ from glob2 import glob
 from loguru import logger
 
 from core.slide_reader import SlideReader, mpp_transformer
-from core.common import check_dir, check_file
+from core.common import check_dir, check_file, verify_png
 
 # for xfeature
 PMSCOPE_MPP = 0.67
 DOWN_LEVEL = 3
-# for match
-ABORT_THRE = 0.5
-MIN_MATCH_COUNT = 20
 
 
 def _read_and_xfeature_sift(img_handle, sift, lock, base_mpp, base_ratio, src_mpp=0.67, down_level=3):
@@ -230,6 +227,14 @@ def registration(sld_n, wsi_path, wsi_attrs, roi_ind_sld_file, save_dir):
     # get roi path
     with open(roi_ind_sld_file, 'r') as f:
         roi_paths = [l.strip() for l in f.readlines()]
+    if RESUME:
+        roi_paths = [p for p in roi_paths if not verify_png(os.path.join(save_dir, os.path.basename(p).split('.')[0] + ".png"))]
+        if len(roi_paths):
+            logger.info(f"resume registration: {batch} {sld_n} left ROI: {len(roi_paths)}")
+        else:
+            logger.info(f"resume registration: no ROI left in {batch} {sld_n}, skip.")
+            return
+
     # xfeature
     xfeature_results = xfeature_sift(sld_n, roi_paths, wsi_reader, lock)
     # prepare match and save
@@ -251,6 +256,9 @@ if __name__ == '__main__':
     parser.add_argument("-x", "--batch2x", type=str, help="Batch to x file for WSI path")
     parser.add_argument("-t", "--thread_num", type=int, default=2, help="multithread")
     parser.add_argument("-p", "--process_num", type=int, default=2, help="multiprocess")
+    parser.add_argument("--abort_threshold", type=float, default=0.5, help="max distance threshold ratio")
+    parser.add_argument("--min_match", type=int, default=20, help="min match count threshold.")
+    parser.add_argument("--resume", default=False, action="store_true")
     args = parser.parse_args()
 
     # === Parse Args ===
@@ -279,6 +287,14 @@ if __name__ == '__main__':
     THREAD_NUMBER = args.thread_num
     global PROCESS_NUMBER
     PROCESS_NUMBER = args.process_num
+    # for match
+    global ABORT_THRE
+    global MIN_MATCH_COUNT
+    ABORT_THRE = args.abort_threshold
+    MIN_MATCH_COUNT = args.min_match
+    # resume
+    global RESUME
+    RESUME = args.resume
     # === End Parse Args ===
 
     for batch in batches:

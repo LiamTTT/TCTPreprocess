@@ -357,7 +357,7 @@ if __name__ == '__main__':
                     except FileNotFoundError or KeyError as e:
                         logger.error(f"Batch {batch} Slide {sld_n}"
                                      f"\nWSI Path {wsi_bat_dirs}, {sld_n}.{wsi_bat_suffix}"
-                                     f"\nIndex file {os.path.join(roi_ind_bat_dir, {sld_n}+'.txt')}"
+                                     f"\nIndex file {os.path.join(roi_ind_bat_dir, sld_n + '.txt')}"
                                      f"\n{e}")
                         continue
                     save_dir = os.path.join(bat_save_root, sld_n)
@@ -392,7 +392,7 @@ if __name__ == '__main__':
                 except FileNotFoundError or KeyError as e:
                     logger.error(f"Batch {batch} Slide {sld_n}"
                                  f"\nWSI Path {wsi_bat_dirs}, {sld_n}.{wsi_bat_suffix}"
-                                 f"\nIndex file {os.path.join(roi_ind_bat_dir, {sld_n}+'.txt')}"
+                                 f"\nIndex file {os.path.join(roi_ind_bat_dir, sld_n + '.txt')}"
                                  f"\n{e}")
                     continue
                 save_dir = os.path.join(bat_save_root, sld_n)

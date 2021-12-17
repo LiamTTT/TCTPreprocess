@@ -29,6 +29,19 @@ wsi_handle = SlideReader()
 SRC_TYPE = 'MicroScope'
 
 
+def _save_image(image_path, image, max_try=3):
+    for _ in range(max_try):
+        if verify_jpeg(image_path):
+            return True
+        cv2.imwrite(image_path, image)
+    if verify_jpeg(image_path):
+        return True
+    else:
+        # delete corrupt image and return false
+        os.remove(image_path)
+        return False
+
+
 def create_sample_for_annotation_xml(xml_file):
     annotation = xmltodict.parse(open(xml_file, 'rb'))['annotation']
     anno_src = annotation['source']
@@ -57,7 +70,7 @@ def create_and_save_sample_for_annotation_xml(xml_file, jpeg_path, lock):
     if sample is None:
         logger.error(f'create {jpeg_path} for {xml_file} failed!')
         return False
-    if not cv2.imwrite(jpeg_path, sample):
+    if not _save_image(jpeg_path, sample):
         logger.error(f'save {jpeg_path} for {xml_file} failed!')
         return False
     return True

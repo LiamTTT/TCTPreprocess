@@ -61,6 +61,9 @@ def get_obj_in_tile(det_object, center_delta, bnd_size, tile_size):
     (obj_kwargs['xmin'], obj_kwargs['ymin'], obj_kwargs['xmax'], obj_kwargs['ymax']), seg = get_bnd_in_tile(center_delta,
                                                                                                             bnd_size,
                                                                                                             tile_size)
+    if obj_kwargs['xmin'] == obj_kwargs['xmax'] or obj_kwargs['ymin'] == obj_kwargs['ymax']:
+        # FIXME 211217 siboliu: The main reason for zero obj is not clear, this condition is temporal solution.
+        return None, None
     return create_voc_object(**obj_kwargs), seg
 
 
@@ -100,18 +103,23 @@ def create_annotation_of_slide(xml_path, tile_size, center_anno=True, nb_sample=
         # get main object
         main_shifts = []
         for shift_id in range(nb_sample):
-            shift_x = (random.random() - 0.5) * 0.96 * tile_size[0]
-            shift_y = (random.random() - 0.5) * 0.96 * tile_size[1]
+            shift_x = (random.random() - 0.5) * 0.90 * tile_size[0]
+            shift_y = (random.random() - 0.5) * 0.90 * tile_size[1]
             main_shifts.append(np.array([shift_x, shift_y], dtype=int))
         if center_anno:
             main_shifts[0] = np.zeros((2, ))
         for shift_id, main_shift in enumerate(main_shifts):
             objects = []
             obj_in_tile, segmented = get_obj_in_tile(det_object, main_shift, bnds_wh[idx], tile_size)
+            if obj_in_tile is None:
+                logger.warning(f"annotations is invalid: {xml_filename}, {idx} annotation, shift id: {main_shift}, bnd: {bnds_wh[idx]}")
+                continue
             objects.append(obj_in_tile)
             neighbor_idx, neighbor_delta = find_neighbors_for_given_center(idx, main_shift, tile_size, bnds_center)
             for ni, nd in zip(neighbor_idx, neighbor_delta):
                 obj_in_tile, seg = get_obj_in_tile(det_objects[ni], main_shift + nd, bnds_wh[ni], tile_size)
+                if obj_in_tile is None:
+                    continue
                 segmented |= seg
                 objects.append(obj_in_tile)
             # define other attributes in annotation file.

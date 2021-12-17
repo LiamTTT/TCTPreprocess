@@ -42,23 +42,23 @@ def process_annotaion(annotation_path, image_path, save_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Drawing annotations on images for checking")
-    parser.add_argument('-r', '--dataset_root', type=str, help="Diractory to dataset.")
+    parser.add_argument('-r', '--dataset_dir', type=str, help="Directory to dataset.")
     parser.add_argument('-s', '--save_root', type=str, default=None, help='save root')
     args = parser.parse_args()
 
-    dataset_root = args.dataset_root
+    dataset_dir = args.dataset_dir
     save_root = args.save_root
-    if save_root is None: save_root = dataset_root
-    images_dir = os.path.join(dataset_root, 'JPEGImages')
-    annotations_dir = os.path.join(dataset_root, 'Annotations')
+    if save_root is None: save_root = dataset_dir
+    images_dir = os.path.join(dataset_dir, 'JPEGImages')
+    annotations_dir = os.path.join(dataset_dir, 'Annotations')
     save_dir = os.path.join(save_root, 'checking')
     check_dir(save_dir, True, logger)
 
     image_names = [f.split('.xml')[0] for f in os.listdir(annotations_dir)]
     nb_success = 0
     time_fmt = "%a %b %d %H:%M:%S %Y"
-    logger.info(f'processing {os.path.basename(dataset_root)} start time: {time.strftime(time_fmt, time.localtime())}')
-    with ThreadPoolExecutor(5, f'{os.path.basename(dataset_root)}-ThreadPool') as executor:
+    logger.info(f'processing {os.path.basename(dataset_dir)} start time: {time.strftime(time_fmt, time.localtime())}')
+    with ThreadPoolExecutor(5, f'{os.path.basename(dataset_dir)}-ThreadPool') as executor:
         futures_draw = {}
         for img_n in image_names:
             annotation_path = os.path.join(annotations_dir, img_n + '.xml')

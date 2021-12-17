@@ -30,10 +30,11 @@ if __name__ == '__main__':
     parser.add_argument('--ratios', type=float, nargs='+', default=[8, 1, 1],
                         help='ratios for trains test val dataset.')
     parser.add_argument('--splitting_dict', type=str, help='pre-define splitting dict of slides name.', default=None)
-    parser.add_argument('--roi', help="whether contain roi info.", action='store_true')
+    parser.add_argument('--roi', default=False, help="whether contain roi info.", action='store_true')
     args = parser.parse_args()
     SET_NAME = ['train', 'eval', 'test']
-    splitting_dict = os.path.abspath(args.splitting_dict)
+    splitting_dict = args.splitting_dict
+    splitting_dict = os.path.abspath(splitting_dict) if splitting_dict is not None else splitting_dict
     flg_roi = args.roi
     dataset_root = os.path.abspath(args.dataset_root)
     logger.info(f'Processing {dataset_root}')
@@ -42,7 +43,7 @@ if __name__ == '__main__':
         logger.warning(f'Using pre define splitting, the splitting ratio will not be guaranteed: {splitting_dict}')
         splitting_dict = json.load(open(splitting_dict, 'r'))
     if flg_roi:
-        logger.warning('Slide is consisted by rois.')
+        logger.warning('Slide is composed by rois.')
     if not isinstance(ratios, list) or len(ratios) == 0:
         logger.error('arg --ratios get a wrong format!')
         raise ValueError('arg --ratios get a wrong format!')

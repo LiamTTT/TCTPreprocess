@@ -109,8 +109,8 @@ def create_annotation_of_roi(image_roi, center_anno=True, nb_sample=1):
             objects = []
             obj_in_tile, segmented = get_obj_in_tile(bnds_cls[idx], main_shift, bnds_wh[idx], tile_size)
             if obj_in_tile is None:
-                logger.warning(f"annotations is invalid: {image_roi}, {idx} annotation, shift id: {main_shift}, bnd: {bnds_wh[idx]}")
-                continue
+                logger.warning(f"annotations is invalid: {image_roi}, {idx} annotation, shift id: {shift_id}, bnd: {bnds_wh[idx]}")
+                break
             objects.append(obj_in_tile)
             neighbor_idx, neighbor_delta = find_neighbors_for_given_center(idx, main_shift, tile_size, bnds_center)
             for ni, nd in zip(neighbor_idx, neighbor_delta):

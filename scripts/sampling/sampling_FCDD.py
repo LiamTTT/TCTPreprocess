@@ -125,11 +125,8 @@ if __name__ == '__main__':
     parser.add_argument('--slide_root', help='dir to WSI files', type=str)
     parser.add_argument('--batch_to_x', help='path to batch to x file', type=str)
     parser.add_argument('--attrs_lut', help='path to WSI attributes', type=str)
-    parser.add_argument('--log', help='path to log file', type=str, default=f'log/{os.path.basename(__file__)}.log')
     args = parser.parse_args()
 
-    global logger
-    logger.add(args.log, backtrace=True, diagnose=True)
     # parse lut
     global BAT_TO_DIR
     global BAT_TO_SUFFIX

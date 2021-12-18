@@ -112,8 +112,8 @@ def create_annotation_of_slide(xml_path, tile_size, center_anno=True, nb_sample=
             objects = []
             obj_in_tile, segmented = get_obj_in_tile(det_object, main_shift, bnds_wh[idx], tile_size)
             if obj_in_tile is None:
-                logger.warning(f"annotations is invalid: {xml_filename}, {idx} annotation, shift id: {main_shift}, bnd: {bnds_wh[idx]}")
-                continue
+                logger.warning(f"annotations is invalid, skip: {xml_filename}, {idx} annotation, shift id: {shift_id}, bnd: {bnds_wh[idx]}")
+                break
             objects.append(obj_in_tile)
             neighbor_idx, neighbor_delta = find_neighbors_for_given_center(idx, main_shift, tile_size, bnds_center)
             for ni, nd in zip(neighbor_idx, neighbor_delta):
